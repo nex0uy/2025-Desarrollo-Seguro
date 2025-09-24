@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import InvoiceService from '../services/invoiceService';
 import { Invoice } from '../types/invoice';
+import * as path from 'path';
 
 const listInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -49,6 +50,11 @@ const getInvoicePDF = async (req: Request, res: Response, next: NextFunction) =>
     if (!pdfName) {
       return res.status(400).json({ error: 'Missing parameter pdfName' });
     }
+
+    if (pdfName.includes('..') || path.isAbsolute(pdfName) || !pdfName.endsWith('.pdf')) {
+      return res.status(400).json({ error: 'Invalid pdfName' });
+    }
+
     const id   = (req as any).user!.id; 
     const pdf = await InvoiceService.getReceipt(invoiceId, pdfName, id);
     // return the pdf as a binary response

@@ -5,6 +5,9 @@ import axios from 'axios';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
+const __filename = new URL(import.meta.url).pathname;
+const __dirname = path.dirname(__filename);
+
 interface InvoiceRow {
   id: string;
   userId: string;
@@ -72,8 +75,15 @@ class InvoiceService {
     if (!invoice) {
       throw new Error('Invoice not found');
     }
+
     try {
-      const filePath = `/invoices/${pdfName}`;
+      const safeDir = path.join(process.cwd(), 'services/backend/resources'); 
+      const filePath = path.join(safeDir, cleanName);
+
+      if (!filePath.startsWith(safeDir)) {
+        throw new Error('Access denied');
+      }
+
       const content = await fs.readFile(filePath, 'utf-8');
       return content;
     } catch (error) {
