@@ -5,6 +5,9 @@ import axios from 'axios';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
+const __filename = new URL(import.meta.url).pathname;
+const __dirname = path.dirname(__filename);
+
 interface InvoiceRow {
   id: string;
   userId: string;
@@ -53,8 +56,8 @@ class InvoiceService {
       .where({ id: invoiceId, userId })
       .update({ status: 'paid' });  
     };
-  static async  getInvoice( invoiceId:string): Promise<Invoice> {
-    const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId }).first();
+  static async  getInvoice( invoiceId:string, userId: string): Promise<Invoice> {
+    const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId, userId }).first();
     if (!invoice) {
       throw new Error('Invoice not found');
     }
@@ -64,15 +67,23 @@ class InvoiceService {
 
   static async getReceipt(
     invoiceId: string,
-    pdfName: string
+    pdfName: string,
+    userId: string
   ) {
     // check if the invoice exists
-    const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId }).first();
+    const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId, userId }).first();
     if (!invoice) {
       throw new Error('Invoice not found');
     }
+
     try {
-      const filePath = `/invoices/${pdfName}`;
+      const safeDir = path.join(process.cwd(), 'services/backend/resources'); 
+      const filePath = path.join(safeDir, cleanName);
+
+      if (!filePath.startsWith(safeDir)) {
+        throw new Error('Access denied');
+      }
+
       const content = await fs.readFile(filePath, 'utf-8');
       return content;
     } catch (error) {
