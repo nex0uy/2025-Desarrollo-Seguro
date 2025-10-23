@@ -1,19 +1,15 @@
 import jwt from 'jsonwebtoken';
 
 const generateToken = (userId: string) => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error('JWT_SECRET is not set');
   return jwt.sign(
     { id: userId }, 
-    secret, 
+    "secreto_super_seguro", 
     { expiresIn: '1h' }
   );
 };
 
 const verifyToken = (token: string) => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error('JWT_SECRET is not set');
-  return jwt.verify(token, secret);
+  return jwt.verify(token, "secreto_super_seguro");
 };
 
 export default {
