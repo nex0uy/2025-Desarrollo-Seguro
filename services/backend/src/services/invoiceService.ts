@@ -13,10 +13,20 @@ interface InvoiceRow {
   status: string;
 }
 
-class InvoiceService {
+function validateHost(host: string): string {
+  const parsed = new URL(`http://${host}/payments`);
+  // permitimos hosts conocidos unicamente
+  const allowedHosts = ['visa.api.local', 'mastercard.api.local', 'amex.api.local'];
+  if (!allowedHosts.includes(parsed.hostname)) {
+    throw new Error('Host no permitido');
+  }
+  return parsed.toString();
+}                       
+
+class InvoiceService {          
   static async list( userId: string, status?: string, operator?: string): Promise<Invoice[]> {
     let q = db<InvoiceRow>('invoices').where({ userId: userId });
-    if (status) q = q.andWhereRaw(" status "+ operator + " '"+ status +"'");
+    if (status) q = q.andWhere('status', '=', status);
     const rows = await q.select();
     const invoices = rows.map(row => ({
       id: row.id,
@@ -36,14 +46,16 @@ class InvoiceService {
     ccv: string,
     expirationDate: string
   ) {
-    // use axios to call http://paymentBrand/payments as a POST request
-    // with the body containing ccNumber, ccv, expirationDate
-    // and handle the response accordingly
-    const paymentResponse = await axios.post(`http://${paymentBrand}/payments`, {
+    // Validar y construir URL segura antes de llamar a axios!
+    const safeUrl = validateHost(paymentBrand);
+
+    // Hacer POST usando la URL segura!
+    const paymentResponse = await axios.post(safeUrl, {
       ccNumber,
       ccv,
-      expirationDate
+      expirationDate,
     });
+
     if (paymentResponse.status !== 200) {
       throw new Error('Payment failed');
     }
@@ -53,6 +65,7 @@ class InvoiceService {
       .where({ id: invoiceId, userId })
       .update({ status: 'paid' });  
     };
+
   static async  getInvoice( invoiceId:string): Promise<Invoice> {
     const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId }).first();
     if (!invoice) {
@@ -87,3 +100,4 @@ class InvoiceService {
 };
 
 export default InvoiceService;
+

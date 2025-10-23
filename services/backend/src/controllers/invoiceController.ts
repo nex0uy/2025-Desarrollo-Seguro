@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import InvoiceService from '../services/invoiceService';
 import { Invoice } from '../types/invoice';
+import * as path from 'path';
 
 const listInvoices = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -49,7 +50,13 @@ const getInvoicePDF = async (req: Request, res: Response, next: NextFunction) =>
     if (!pdfName) {
       return res.status(400).json({ error: 'Missing parameter pdfName' });
     }
-    const pdf = await InvoiceService.getReceipt(invoiceId, pdfName);
+
+    if (pdfName.includes('..') || path.isAbsolute(pdfName) || !pdfName.endsWith('.pdf')) {
+      return res.status(400).json({ error: 'Invalid pdfName' });
+    }
+
+    const id   = (req as any).user!.id; 
+    const pdf = await InvoiceService.getReceipt(invoiceId, pdfName, id);
     // return the pdf as a binary response
     res.setHeader('Content-Type', 'application/pdf');
     res.send(pdf);
@@ -62,7 +69,8 @@ const getInvoicePDF = async (req: Request, res: Response, next: NextFunction) =>
 const getInvoice = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const invoiceId = req.params.id;
-    const invoice = await InvoiceService.getInvoice(invoiceId);
+    const id   = (req as any).user!.id; 
+    const invoice = await InvoiceService.getInvoice(invoiceId, id);
     res.status(200).json(invoice);
 
   } catch (err) {
