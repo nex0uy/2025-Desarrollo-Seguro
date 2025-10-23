@@ -5,9 +5,6 @@ import axios from 'axios';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
-const __filename = new URL(import.meta.url).pathname;
-const __dirname = path.dirname(__filename);
-
 interface InvoiceRow {
   id: string;
   userId: string;
@@ -16,7 +13,17 @@ interface InvoiceRow {
   status: string;
 }
 
-class InvoiceService {
+function validateHost(host: string): string {
+  const parsed = new URL(`http://${host}/payments`);
+  // permitimos hosts conocidos unicamente
+  const allowedHosts = ['visa.api.local', 'mastercard.api.local', 'amex.api.local'];
+  if (!allowedHosts.includes(parsed.hostname)) {
+    throw new Error('Host no permitido');
+  }
+  return parsed.toString();
+}                       
+
+class InvoiceService {          
   static async list( userId: string, status?: string, operator?: string): Promise<Invoice[]> {
     let q = db<InvoiceRow>('invoices').where({ userId: userId });
     if (status) q = q.andWhere('status', '=', status);
@@ -39,14 +46,16 @@ class InvoiceService {
     ccv: string,
     expirationDate: string
   ) {
-    // use axios to call http://paymentBrand/payments as a POST request
-    // with the body containing ccNumber, ccv, expirationDate
-    // and handle the response accordingly
-    const paymentResponse = await axios.post(`http://${paymentBrand}/payments`, {
+    // Validar y construir URL segura antes de llamar a axios!
+    const safeUrl = validateHost(paymentBrand);
+
+    // Hacer POST usando la URL segura!
+    const paymentResponse = await axios.post(safeUrl, {
       ccNumber,
       ccv,
-      expirationDate
+      expirationDate,
     });
+
     if (paymentResponse.status !== 200) {
       throw new Error('Payment failed');
     }
@@ -56,8 +65,9 @@ class InvoiceService {
       .where({ id: invoiceId, userId })
       .update({ status: 'paid' });  
     };
-  static async  getInvoice( invoiceId:string, userId: string): Promise<Invoice> {
-    const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId, userId }).first();
+
+  static async  getInvoice( invoiceId:string): Promise<Invoice> {
+    const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId }).first();
     if (!invoice) {
       throw new Error('Invoice not found');
     }
@@ -67,23 +77,15 @@ class InvoiceService {
 
   static async getReceipt(
     invoiceId: string,
-    pdfName: string,
-    userId: string
+    pdfName: string
   ) {
     // check if the invoice exists
-    const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId, userId }).first();
+    const invoice = await db<InvoiceRow>('invoices').where({ id: invoiceId }).first();
     if (!invoice) {
       throw new Error('Invoice not found');
     }
-
     try {
-      const safeDir = path.join(process.cwd(), 'services/backend/resources'); 
-      const filePath = path.join(safeDir, cleanName);
-
-      if (!filePath.startsWith(safeDir)) {
-        throw new Error('Access denied');
-      }
-
+      const filePath = `/invoices/${pdfName}`;
       const content = await fs.readFile(filePath, 'utf-8');
       return content;
     } catch (error) {
@@ -98,3 +100,4 @@ class InvoiceService {
 };
 
 export default InvoiceService;
+
