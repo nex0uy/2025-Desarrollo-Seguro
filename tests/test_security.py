@@ -66,3 +66,58 @@ def test_login(setup_create_user):
     auth_token = response.json()["token"]
     assert auth_token
 
+
+# TEST SQL INJECTION
+def test_sql_injection(setup_create_user):
+    # Hacemos login para tener el token
+    username = setup_create_user[0]
+    password = setup_create_user[1]
+    
+    login = requests.post("http://localhost:5000/auth/login", 
+                         json={"username": username, "password": password})
+    token = login.json()["token"]
+    
+    # Preparamos el ataque!
+    ataque_sql = "paid' OR '1'='1"
+    operador_malicioso = "="
+    
+    # Hacemos el ataque!
+    headers = {"Authorization": f"Bearer {token}"}
+    response = requests.get(
+        "http://localhost:5000/invoices",
+        headers=headers,
+        params={
+            "status": ataque_sql,
+            "operator": operador_malicioso
+        }
+    )
+    
+    if response.status_code == 200 and len(response.json()) > 0:
+        assert False, "APP VULNERABLE!"
+    else:
+        assert True 
+
+
+def test_regresion_sql_injection(setup_create_user):
+    # Hacemos login para tener el token
+    username = setup_create_user[0]
+    password = setup_create_user[1]
+    
+    login = requests.post("http://localhost:5000/auth/login", 
+                         json={"username": username, "password": password})
+    token = login.json()["token"]
+    
+    # Hacemos la consulta normal
+    headers = {"Authorization": f"Bearer {token}"}
+    response = requests.get(
+        "http://localhost:5000/invoices",
+        headers=headers,
+        params={
+            "status": "pending",
+            "operator": "="
+        }
+    )
+    
+    # Verificamos que funciona igual
+    assert response.status_code == 200, "No funciona!"
+
