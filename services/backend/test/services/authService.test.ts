@@ -350,4 +350,41 @@ describe('AuthService.generateJwt', () => {
     expect((decoded as any).id).toBe(userId);
   });
 
+  // TEST DE Template Injection
+  it('No se debe ejecutar codigo en el nombre de usuario!!!!', async () => {
+    
+    // Creamos un usuario y simulamos que tiene codigo en el nombre.
+    const usuario = {
+      username: 'hacker',
+      email: 'hacker@hacker.com',
+      password: 'hacker',
+      first_name: '<%= 7+7 %>',  // Codigo malo >.< 
+      last_name: 'apellido del hacker'
+    } as User;
+
+    // Simulamos la base de datos y que no existe
+    const mockBuscar = {
+      where: jest.fn().mockReturnThis(),
+      orWhere: jest.fn().mockReturnThis(),
+      first: jest.fn().mockResolvedValue(null) 
+    };
+    
+    const mockGuardar = {
+      insert: jest.fn().mockReturnThis()  
+    };
+
+    mockedDb
+      .mockReturnValueOnce(mockBuscar as any)
+      .mockReturnValueOnce(mockGuardar as any);
+
+    // Llamamos a crear usuario con nuestro usuario
+    await AuthService.createUser(usuario);
+
+    // Obtenemos el correo que se envia
+    const correo = (mockedNodemailer.createTransport().sendMail as jest.Mock).mock.calls[0][0];
+    const htmlDelCorreo = correo.html;
+
+    // Verificamos que no tenga el numero 14, si lo tiene es xq se ejecuto codigo malo >.<
+    expect(htmlDelCorreo).not.toContain('14');
+  });
 });
